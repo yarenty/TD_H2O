@@ -6,7 +6,7 @@ import water.parser._
   * Created by yarenty on 15/07/2016.
   * (C)2015 SkyCorp Ltd.
   */
-class GenderAge(val deviceID: Option[String],
+class GenderAge(val device_id: Option[String],
                 val gender: Option[Int],
                 val age: Option[Int],
                 val group: Option[String]) extends Product with Serializable {
@@ -16,7 +16,7 @@ class GenderAge(val deviceID: Option[String],
   override def productArity: Int = 4
 
   override def productElement(n: Int) = n match {
-    case 0 => deviceID
+    case 0 => device_id
     case 1 => gender
     case 2 => age
     case 3 => group
@@ -76,6 +76,7 @@ object GenderAgeCSVParser {
     parseOrders.setColumnTypes(orderTypes)
     parseOrders.setParseType(DefaultParserProviders.CSV_INFO)
     parseOrders.setNumberColumns(4)
+    parseOrders.setSeparator(44)
     parseOrders.setSingleQuotes(false)
     parseOrders.setCheckHeader(1)
     return parseOrders

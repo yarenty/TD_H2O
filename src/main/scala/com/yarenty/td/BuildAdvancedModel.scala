@@ -48,6 +48,8 @@ object BuildAdvancedModel extends SparkContextSupport {
 
     println(s"\n\n LETS MODEL\n")
 
+
+  /*
     addFiles(sc, absPath(data_dir + "test"))
     addFiles(sc, absPath(data_dir + "train"))
     val trainURI= new URI("file:///" + SparkFiles.get("train" ))
@@ -79,6 +81,7 @@ object BuildAdvancedModel extends SparkContextSupport {
      testData.add("predict", vec)
       println("OUT VECTOR:" + vec.length)
       saveOutput(testData)
+      */
 
     println("=========> off to go!!!")
   }

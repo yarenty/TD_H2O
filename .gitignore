@@ -72,3 +72,5 @@ src/main/scala-2.11/
 h2ologs
 h2ologs/
 h2ologs/*
+build/
+src/test/

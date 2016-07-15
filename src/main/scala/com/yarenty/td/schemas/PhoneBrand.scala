@@ -6,9 +6,9 @@ import water.parser._
   * Created by yarenty on 15/07/2016.
   * (C)2015 SkyCorp Ltd.
   */
-class PhoneBrand(val deviceID: Option[String],
-                val brand: Option[String],
-                val model: Option[String]
+class PhoneBrand(val device_id: Option[String],
+                val phone_brand: Option[String],
+                val device_model: Option[String]
             ) extends Product with Serializable {
 
   override def canEqual(that: Any): Boolean = that.isInstanceOf[GenderAge]
@@ -16,9 +16,9 @@ class PhoneBrand(val deviceID: Option[String],
   override def productArity: Int = 3
 
   override def productElement(n: Int) = n match {
-    case 0 => deviceID
-    case 1 => brand
-    case 2 => model
+    case 0 => device_id
+    case 1 => phone_brand
+    case 2 => device_model
     case _ => throw new IndexOutOfBoundsException(n.toString)
   }
 
@@ -74,6 +74,7 @@ object PhoneBrandCSVParser {
     parseOrders.setColumnTypes(orderTypes)
     parseOrders.setParseType(DefaultParserProviders.CSV_INFO)
     parseOrders.setNumberColumns(3)
+    parseOrders.setSeparator(44)
     parseOrders.setSingleQuotes(false)
     parseOrders.setCheckHeader(1)
     return parseOrders

@@ -7,20 +7,23 @@ import water.parser._
   * Created by yarenty on 15/07/2016.
   * (C)2015 SkyCorp Ltd.
   */
-class AppEvent(val event_id: Option[Int],
-                val app_id: Option[String],
-                val is_installed: Option[Int],
-                val is_active: Option[Int]) extends Product with Serializable {
+class Event(val event_id: Option[Int],
+                val device_id: Option[String],
+                val timestamp: Long,
+                val longitude: Option[Float],
+                val latitude: Option[Float]
+           ) extends Product with Serializable {
 
-  override def canEqual(that: Any): Boolean = that.isInstanceOf[AppEvent]
+  override def canEqual(that: Any): Boolean = that.isInstanceOf[Event]
 
-  override def productArity: Int = 4
+  override def productArity: Int = 5
 
   override def productElement(n: Int) = n match {
     case 0 => event_id
-    case 1 => app_id
-    case 2 => is_installed
-    case 3 => is_active
+    case 1 => device_id
+    case 2 => timestamp
+    case 3 => longitude
+    case 4 => latitude
     case _ => throw new IndexOutOfBoundsException(n.toString)
   }
 
@@ -37,46 +40,47 @@ class AppEvent(val event_id: Option[Int],
 }
 
 /** A dummy csv parser for orders dataset. */
-object AppEventParse extends Serializable {
-  def apply(row: Array[String]): AppEvent = {
+object EventParse extends Serializable {
+  def apply(row: Array[String]): Event = {
 
     import water.support.ParseSupport._
 
-    new AppEvent(
+    new Event(
       int(row(0)), // device_id
       str(row(1)), // gender
-      int(row(2)), // age
-      int(row(3)) // group
+      ParseTime.attemptTimeParse(new BufferedString(str(row(2)).get)), // age
+      float(row(3)), // group
+      float(row(4)) // group
     )
   }
 }
 
 
 //parseFiles
-//  paths: ["/opt/data/TalkingData/input/app_events.csv"]
-//  destination_frame: "app_events.hex"
+//  paths: ["/opt/data/TalkingData/input/events.csv"]
+//  destination_frame: "events.hex"
 //  parse_type: "CSV"
 //  separator: 44
-//  number_columns: 4
+//  number_columns: 5
 //  single_quotes: false
-//  column_names: ["event_id","app_id","is_installed","is_active"]
-//  column_types: ["Numeric","String","Numeric","Numeric"]
+//  column_names: ["event_id","device_id","timestamp","longitude","latitude"]
+//  column_types: ["Numeric","String","Time","Numeric","Numeric"]
 //  delete_on_done: true
 //  check_header: 1
-//  chunk_size: 32414720
+//  chunk_size: 6107648
 
-object AppEventCSVParser {
+object EventCSVParser {
 
   def get: ParseSetup = {
     val parseOrders: ParseSetup = new ParseSetup()
     val orderNames: Array[String] = Array(
-      "event_id","app_id","is_installed","is_active")
+      "event_id","device_id","timestamp","longitude","latitude")
     val orderTypes = ParseSetup.strToColumnTypes(Array(
-      "int", "string", "int", "int"))
+      "int", "string", "time", "double", "double"))
     parseOrders.setColumnNames(orderNames)
     parseOrders.setColumnTypes(orderTypes)
     parseOrders.setParseType(DefaultParserProviders.CSV_INFO)
-    parseOrders.setNumberColumns(4)
+    parseOrders.setNumberColumns(5)
     parseOrders.setSeparator(44)
     parseOrders.setSingleQuotes(false)
     parseOrders.setCheckHeader(1)

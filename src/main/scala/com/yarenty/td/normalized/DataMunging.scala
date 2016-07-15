@@ -32,6 +32,7 @@ object DataMunging extends SparkContextSupport {
   val app_events = "app_events.csv"
   val events = "events.csv"
   val app_labels = "app_labels.csv"
+  val label_categories = "label_categories.csv"
   val phone_brand = "phone_brand_device_model.csv"
 
 
@@ -50,6 +51,7 @@ object DataMunging extends SparkContextSupport {
       absPath(input_data_dir + phone_brand),
       absPath(input_data_dir + app_events),
       absPath(input_data_dir + app_labels),
+      absPath(input_data_dir + label_categories),
       absPath(input_data_dir + events)
     )
 
@@ -58,19 +60,31 @@ object DataMunging extends SparkContextSupport {
     println(s"\n===> genderAge via H2O#Frame#count: ${genderAgeData.numRows}\n")
     val genderAgeTable = asRDD[GenderAge](genderAgeData)
 
-
     val appEventData =  new h2o.H2OFrame(AppEventCSVParser.get, new File(SparkFiles.get(app_events)))
     println(s"\n===> appEventData via H2O#Frame#count: ${ appEventData.numRows}\n")
     val appEventTable = asRDD[AppEvent](appEventData)
 
+    val eventData =  new h2o.H2OFrame(EventCSVParser.get, new File(SparkFiles.get(events)))
+    println(s"\n===> eventData via H2O#Frame#count: ${ eventData.numRows}\n")
+    val eventTable = asRDD[Event](eventData)
 
     val phoneBrandData =  new h2o.H2OFrame(PhoneBrandCSVParser.get, new File(SparkFiles.get(phone_brand)))
     println(s"\n===> phoneBrandData via H2O#Frame#count: ${phoneBrandData.numRows}\n")
     val phoneBrandTable = asRDD[PhoneBrand](phoneBrandData)
 
 
+    val appLabelsData =  new h2o.H2OFrame(AppLabelsCSVParser.get, new File(SparkFiles.get(app_labels)))
+    println(s"\n===> appLabelsData via H2O#Frame#count: ${appLabelsData.numRows}\n")
+    val appLabelsTable = asRDD[AppLabels](appLabelsData)
+
+    val labelCatData =  new h2o.H2OFrame(LabelCategoriesCSVParser.get, new File(SparkFiles.get(label_categories)))
+    println(s"\n===> labelCatData via H2O#Frame#count: ${labelCatData.numRows}\n")
+    val labelCatTable = asRDD[LabelCategories](labelCatData)
 
 
+
+
+//    genderAgeTable.map()
 
 
 //      val myData = new h2o.H2OFrame(lineBuilder(headers, types,
