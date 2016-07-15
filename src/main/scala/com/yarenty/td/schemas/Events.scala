@@ -8,8 +8,8 @@ import water.parser._
   * (C)2015 SkyCorp Ltd.
   */
 class Event(val event_id: Option[Int],
-                val device_id: Option[String],
-                val timestamp: Long,
+                val device_id: Option[Long],
+                val timestamp: Option[Int],
                 val longitude: Option[Float],
                 val latitude: Option[Float]
            ) extends Product with Serializable {
@@ -39,21 +39,63 @@ class Event(val event_id: Option[Int],
     .forall(e => e == None)
 }
 
+
+class EventIN(val event_id: Option[Int],
+                val device_id: Option[Long],
+                val timestamp: Option[String],
+                val longitude: Option[Float],
+                val latitude: Option[Float]
+           ) extends Product with Serializable {
+
+  override def canEqual(that: Any): Boolean = that.isInstanceOf[Event]
+
+  override def productArity: Int = 5
+
+  override def productElement(n: Int) = n match {
+    case 0 => event_id
+    case 1 => device_id
+    case 2 => timestamp
+    case 3 => longitude
+    case 4 => latitude
+    case _ => throw new IndexOutOfBoundsException(n.toString)
+  }
+
+  override def toString: String = {
+    val sb = new StringBuffer
+    for (i <- 0 until productArity)
+      sb.append(productElement(i)).append(',')
+    sb.toString
+  }
+
+  def isWrongRow(): Boolean = (0 until productArity)
+    .map(idx => productElement(idx))
+    .forall(e => e == None)
+}
+
+
+
 /** A dummy csv parser for orders dataset. */
 object EventParse extends Serializable {
-  def apply(row: Array[String]): Event = {
+  def apply(row: EventIN): Event = {
 
     import water.support.ParseSupport._
 
     new Event(
-      int(row(0)), // device_id
-      str(row(1)), // gender
-      ParseTime.attemptTimeParse(new BufferedString(str(row(2)).get)), // age
-      float(row(3)), // group
-      float(row(4)) // group
+      row.event_id, // event_id
+      row.device_id, // device_id
+      Option(getTimeSlice(row.timestamp.get)), // timeslice
+      row.longitude, // long
+      row.latitude // lat
     )
   }
+
+  def getTimeSlice(t: String): Int = {
+    val tt = t.split(" ")(1).split(":")
+    return ((tt(0).toInt * 60 * 60 + tt(1).toInt * 60 + tt(2).toInt) / (10 * 60)) + 1
+  }
+
 }
+
 
 
 //parseFiles
@@ -76,7 +118,7 @@ object EventCSVParser {
     val orderNames: Array[String] = Array(
       "event_id","device_id","timestamp","longitude","latitude")
     val orderTypes = ParseSetup.strToColumnTypes(Array(
-      "int", "string", "time", "double", "double"))
+      "int", "int", "string", "double", "double"))
     parseOrders.setColumnNames(orderNames)
     parseOrders.setColumnTypes(orderTypes)
     parseOrders.setParseType(DefaultParserProviders.CSV_INFO)

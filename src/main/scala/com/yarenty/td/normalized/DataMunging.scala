@@ -8,6 +8,7 @@ import org.apache.spark.h2o._
 import water._
 import water.fvec._
 
+import scala.collection
 import scala.collection.mutable
 import scala.collection.mutable.HashMap
 
@@ -35,6 +36,7 @@ object DataMunging extends SparkContextSupport {
   val label_categories = "label_categories.csv"
   val phone_brand = "phone_brand_device_model.csv"
 
+  val output_filename = "/opt/data/TalkingData/model/train"
 
 
   def process(h2oContext: H2OContext) {
@@ -56,73 +58,109 @@ object DataMunging extends SparkContextSupport {
     )
 
 
-    val genderAgeData =  new h2o.H2OFrame(GenderAgeCSVParser.get, new File(SparkFiles.get(gender_age_train)))
-    println(s"\n===> genderAge via H2O#Frame#count: ${genderAgeData.numRows}\n")
-    val genderAgeTable = asRDD[GenderAge](genderAgeData)
+    val eventData = new h2o.H2OFrame(EventCSVParser.get, new File(SparkFiles.get(events)))
+    println(s"\n===> eventData via H2O#Frame#count: ${eventData.numRows}\n")
+    val eventTable = asRDD[EventIN](eventData)
+      .map(row => EventParse(row))
+      .filter(!_.isWrongRow())
 
-    val appEventData =  new h2o.H2OFrame(AppEventCSVParser.get, new File(SparkFiles.get(app_events)))
-    println(s"\n===> appEventData via H2O#Frame#count: ${ appEventData.numRows}\n")
+    val eventMap = eventTable.map(e => {
+      e.event_id ->(e.device_id, e.timestamp, e.longitude, e.latitude)
+    }).collectAsMap
+
+//    eventData.delete()
+//    eventTable.delete()
+
+
+    val genderAgeData = new h2o.H2OFrame(GenderAgeCSVParser.get, new File(SparkFiles.get(gender_age_train)))
+    println(s"\n===> genderAge via H2O#Frame#count: ${genderAgeData.numRows}\n")
+    val genderAgeMap = asRDD[GenderAge](genderAgeData).map(g => {
+      g.device_id ->(g.age, g.gender)
+    }).collectAsMap
+
+//    genderAgeData.delete()
+
+
+
+    val phoneBrandData = new h2o.H2OFrame(PhoneBrandCSVParser.get, new File(SparkFiles.get(phone_brand)))
+    println(s"\n===> phoneBrandData via H2O#Frame#count: ${phoneBrandData.numRows}\n")
+    val phoneBrandMap = asRDD[PhoneBrand](phoneBrandData).map(p => {
+      p.device_id ->(p.phone_brand, p.device_model)
+    }).collectAsMap
+
+//    phoneBrandData.delete()
+
+    val appLabelsData = new h2o.H2OFrame(AppLabelsCSVParser.get, new File(SparkFiles.get(app_labels)))
+    println(s"\n===> appLabelsData via H2O#Frame#count: ${appLabelsData.numRows}\n")
+    val appLabelsMap = asRDD[AppLabels](appLabelsData).map(l => {
+      l.app_id -> l.label_id
+    }).collectAsMap
+
+//    appLabelsData.delete()
+
+    //    val labelCatData =  new h2o.H2OFrame(LabelCategoriesCSVParser.get, new File(SparkFiles.get(label_categories)))
+    //    println(s"\n===> labelCatData via H2O#Frame#count: ${labelCatData.numRows}\n")
+    //    val labelCatTable = asRDD[LabelCategories](labelCatData)
+
+
+    val appEventData = new h2o.H2OFrame(AppEventCSVParser.get, new File(SparkFiles.get(app_events)))
+    println(s"\n===> appEventData via H2O#Frame#count: ${appEventData.numRows}\n")
     val appEventTable = asRDD[AppEvent](appEventData)
 
-    val eventData =  new h2o.H2OFrame(EventCSVParser.get, new File(SparkFiles.get(events)))
-    println(s"\n===> eventData via H2O#Frame#count: ${ eventData.numRows}\n")
-    val eventTable = asRDD[Event](eventData)
-
-    val phoneBrandData =  new h2o.H2OFrame(PhoneBrandCSVParser.get, new File(SparkFiles.get(phone_brand)))
-    println(s"\n===> phoneBrandData via H2O#Frame#count: ${phoneBrandData.numRows}\n")
-    val phoneBrandTable = asRDD[PhoneBrand](phoneBrandData)
-
-
-    val appLabelsData =  new h2o.H2OFrame(AppLabelsCSVParser.get, new File(SparkFiles.get(app_labels)))
-    println(s"\n===> appLabelsData via H2O#Frame#count: ${appLabelsData.numRows}\n")
-    val appLabelsTable = asRDD[AppLabels](appLabelsData)
-
-    val labelCatData =  new h2o.H2OFrame(LabelCategoriesCSVParser.get, new File(SparkFiles.get(label_categories)))
-    println(s"\n===> labelCatData via H2O#Frame#count: ${labelCatData.numRows}\n")
-    val labelCatTable = asRDD[LabelCategories](labelCatData)
 
 
 
+    val myData = new h2o.H2OFrame(lineBuilder(
+      appEventTable,
+      phoneBrandMap,
+      genderAgeMap,
+      eventMap,
+      appLabelsMap
+    ))
 
-//    genderAgeTable.map()
+    val v = DKV.put(myData)
 
-
-//      val myData = new h2o.H2OFrame(lineBuilder(headers, types,
-//        genderAgeTable
-//))
-//
-//      val v = DKV.put(myData)
-
-//      println(s" AND MY DATA IS: ${myData.key} =>  ${myData.numCols()} / ${myData.numRows()}")
-//      println(s" frame::${v}")
-
-//
-//    Helper.saveCSV(myData, data_dir + "train")
-//
-//      println(
-//        s"""
-//           |!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-//           |!!  OUTPUT CREATED: ${data_dir}train !!
-//           |!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-//         """.stripMargin)
-
-      //clean
-//      myData.delete()
+    println(s" AND MY DATA IS: ${myData.key} =>  ${myData.numCols()} / ${myData.numRows()}")
+    println(s" frame::${v}")
 
 
-      println("... and cleaned")
+    Helper.saveCSV(myData, output_filename)
+
+    println(
+      s"""
+         |!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+         |!!  OUTPUT CREATED: ${output_filename} !!
+         |!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+         """.stripMargin)
+
+    //clean
+    //      myData.delete()
+
+
+    println("... and cleaned")
 
   }
 
 
-  def lineBuilder(headers: Array[String], types: Array[Byte],
-                  dayOfWeek: Int,
-                  gaps: Map[Int, Int],
-                  traffic: Map[Int, Tuple4[Double, Double, Double, Double]],
-                  weather: Map[Int, Tuple3[Int, Double, Double]],
-                  poi: Map[Int, Map[String, Double]]): Frame = {
+  def lineBuilder(
+                   aeMap: RDD[AppEvent],
+                   phoneBrandMap: collection.Map[Option[Long], (Option[String], Option[String])],
+                   genderAgeMap: collection.Map[Option[Long], (Option[Int], Option[Int])],
+                   eventMap: collection.Map[Option[Int], (Option[Long], Option[Int], Option[Float], Option[Float])],
+                   appLabelsMap: collection.Map[Option[Long], Option[Int]]
+                 ): Frame = {
 
-    val len = headers.length
+    val headers = Array(
+      "gender", "age", "timeslice", "lat", "lon",
+      "active", "label",
+      "brand", "model")
+
+    val types = Array(Vec.T_NUM, Vec.T_NUM, Vec.T_NUM, Vec.T_NUM, Vec.T_NUM,
+      Vec.T_NUM, Vec.T_NUM,
+      Vec.T_STR, Vec.T_STR)
+
+
+    val len = Helper.output_headers.length
 
     val fs = new Array[Futures](len)
     val av = new Array[AppendableVec](len)
@@ -132,80 +170,41 @@ object DataMunging extends SparkContextSupport {
 
     for (i <- 0 until len) {
       fs(i) = new Futures()
-      av(i) = new AppendableVec(new Vec.VectorGroup().addVec(), Vec.T_NUM)
+      av(i) = new AppendableVec(new Vec.VectorGroup().addVec(), Helper.output_types(i))
       chunks(i) = new NewChunk(av(i), 0)
     }
 
-    for (ts <- 1 to 144) {
-      for (din <- 1 to 66) {
-        for (dout <- 0 to 66) {
-          val idx = ts
-          chunks(0).addNum(idx)
-          chunks(1).addNum(ts)
-          chunks(2).addNum(din)
-          if (dout == 0) {
-            //chunks(3).addNA()  - is not really unknown as its just outside city
-            chunks(3).addNum(0)
-          } else {
-            chunks(3).addNum(dout)
-          }
 
-          chunks(4).addNum(dayOfWeek)
+    aeMap.map(ae => {
+
+      if (eventMap.contains(ae.event_id)) {
+
+        val event = eventMap.get(ae.event_id).get
+        val devID = event._1
 
 
-          if (gaps.contains(idx)) {
-            chunks(5).addNum(gaps.get(idx).get)
-          }
-          else {
-            chunks(5).addNum(0)
-          }
-
-          var tidx = ts * 100 + din
-          if (traffic.contains(tidx)) {
-            chunks(6).addNum(traffic.get(tidx).get._1)
-            chunks(7).addNum(traffic.get(tidx).get._2)
-            chunks(8).addNum(traffic.get(tidx).get._3)
-            chunks(9).addNum(traffic.get(tidx).get._4)
-          }
-          else {
-            chunks(6).addNA()
-            chunks(7).addNA()
-            chunks(8).addNA()
-            chunks(9).addNA()
-          }
-
-          if (weather.contains(ts)) {
-            chunks(10).addNum(weather.get(ts).get._1)
-            chunks(11).addNum(weather.get(ts).get._2.toDouble)
-            chunks(12).addNum(weather.get(ts).get._3.toDouble)
-          } else {
-            chunks(10).addNA()
-            chunks(11).addNA()
-            chunks(12).addNA()
-          }
-
-          for (pp <- 13 until len) {
-
-            if (poi.contains(din)) {
-              val m = poi.get(din).get
-
-              if (m.contains(headers(pp))) {
-                chunks(pp).addNum(m.get(headers(pp)).get)
-              }
-              else {
-                chunks(pp).addNum(0)
-              }
-            }
-            else {
-              chunks(pp).addNA()
-
-            }
-          }
+        if (genderAgeMap.contains(devID)) {
+          val gen = genderAgeMap.get(devID).get
+         // val phone = phoneBrandMap.get(devID).get
+          val label = appLabelsMap.get(ae.app_id).get
 
 
+          chunks(0).addNum(gen._2.get) //gender
+          chunks(1).addNum(gen._1.get) //age
+
+          chunks(2).addNum(event._2.get)
+          chunks(3).addNum(event._3.get)
+          chunks(4).addNum(event._4.get)
+
+          chunks(5).addNum(ae.is_active.get) //active
+
+          chunks(6).addNum(label.get) //label id -- type
+
+          //chunks(7).addStr(phone._1.get) //brand
+          //chunks(8).addStr(phone._2.get) //brand
         }
       }
-    }
+    }).count()
 
     for (i <- 0 until len) {
       chunks(i).close(0, fs(i))
@@ -217,7 +216,6 @@ object DataMunging extends SparkContextSupport {
     return new Frame(key, headers, vecs)
 
   }
-
 
 
 }

@@ -6,7 +6,7 @@ import water.parser._
   * Created by yarenty on 15/07/2016.
   * (C)2015 SkyCorp Ltd.
   */
-class AppLabels(val app_id: Option[String],
+class AppLabels(val app_id: Option[Long],
                 val label_id: Option[Int]
             ) extends Product with Serializable {
 
@@ -39,7 +39,7 @@ object AppLabelsParse extends Serializable {
     import water.support.ParseSupport._
 
     new AppLabels(
-      str(row(0)), // labelid
+      long(row(0)), // labelid
       int(row(1)) // category
     )
   }
@@ -66,7 +66,7 @@ object AppLabelsCSVParser {
     val orderNames: Array[String] = Array(
       "app_id","label_id")
     val orderTypes = ParseSetup.strToColumnTypes(Array(
-      "string", "enum"))
+      "int", "enum"))
     parseOrders.setColumnNames(orderNames)
     parseOrders.setColumnTypes(orderTypes)
     parseOrders.setParseType(DefaultParserProviders.CSV_INFO)
