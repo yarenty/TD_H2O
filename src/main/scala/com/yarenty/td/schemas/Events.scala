@@ -8,7 +8,7 @@ import water.parser._
   * (C)2015 SkyCorp Ltd.
   */
 class Event(val event_id: Option[Int],
-                val device_id: Option[Long],
+                val device_id: Option[String],
                 val timestamp: Option[Int],
                 val longitude: Option[Float],
                 val latitude: Option[Float]
@@ -41,7 +41,7 @@ class Event(val event_id: Option[Int],
 
 
 class EventIN(val event_id: Option[Int],
-                val device_id: Option[Long],
+                val device_id: Option[String],
                 val timestamp: Option[String],
                 val longitude: Option[Float],
                 val latitude: Option[Float]
@@ -118,7 +118,7 @@ object EventCSVParser {
     val orderNames: Array[String] = Array(
       "event_id","device_id","timestamp","longitude","latitude")
     val orderTypes = ParseSetup.strToColumnTypes(Array(
-      "int", "int", "string", "double", "double"))
+      "int", "string", "string", "double", "double"))
     parseOrders.setColumnNames(orderNames)
     parseOrders.setColumnTypes(orderTypes)
     parseOrders.setParseType(DefaultParserProviders.CSV_INFO)

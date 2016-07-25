@@ -6,7 +6,7 @@ import water.parser._
   * Created by yarenty on 15/07/2016.
   * (C)2015 SkyCorp Ltd.
   */
-class GenderAge(val device_id: Option[Long],
+class GenderAge(val device_id: Option[String],
                 val gender: Option[Int],
                 val age: Option[Int],
                 val group: Option[String]) extends Product with Serializable {
@@ -42,7 +42,7 @@ object GenderAgeParse extends Serializable {
     import water.support.ParseSupport._
 
     new GenderAge(
-      long(row(0)), // device_id
+      str(row(0)), // device_id
       int(row(1)), // gender
       int(row(2)), // age
       str(row(3)) // group
@@ -71,11 +71,31 @@ object GenderAgeCSVParser {
     val orderNames: Array[String] = Array(
       "device_id","gender","age","group")
     val orderTypes = ParseSetup.strToColumnTypes(Array(
-      "int", "enum", "enum", "string"))
+      "string", "enum", "enum", "string"))
     parseOrders.setColumnNames(orderNames)
     parseOrders.setColumnTypes(orderTypes)
     parseOrders.setParseType(DefaultParserProviders.CSV_INFO)
     parseOrders.setNumberColumns(4)
+    parseOrders.setSeparator(44)
+    parseOrders.setSingleQuotes(false)
+    parseOrders.setCheckHeader(1)
+    return parseOrders
+  }
+
+}
+
+object GenderAgeTestCSVParser {
+
+  def get: ParseSetup = {
+    val parseOrders: ParseSetup = new ParseSetup()
+    val orderNames: Array[String] = Array(
+      "device_id")
+    val orderTypes = ParseSetup.strToColumnTypes(Array(
+      "string"))
+    parseOrders.setColumnNames(orderNames)
+    parseOrders.setColumnTypes(orderTypes)
+    parseOrders.setParseType(DefaultParserProviders.CSV_INFO)
+    parseOrders.setNumberColumns(1)
     parseOrders.setSeparator(44)
     parseOrders.setSingleQuotes(false)
     parseOrders.setCheckHeader(1)

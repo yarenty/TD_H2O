@@ -79,7 +79,7 @@ The command creates jar file `build/libs/td.jar` containing all necessary classe
 Submit application to Spark cluster (in this case, local cluster is used):
 ```
 export MASTER='local-cluster[3,2,1024]'
-$SPARK_HOME/bin/spark-submit --class com.yarenty.td.MLProcessor build/libs/ddi.jar
+$SPARK_HOME/bin/spark-submit --class com.yarenty.td.MLProcessor build/libs/td.jar
 ```
 
 

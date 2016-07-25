@@ -53,6 +53,24 @@ object Helper {
   }
 
 
+  /**
+    * Create array (1021) of int values where = 1 if index was in input string
+    * @param str
+    * @return
+    */
+  def mapCreator(str: String): Array[Int] = {
+    val all = str.split(",").map( i => i.toInt)
+
+    val out = new Array[Int](1021)
+    for (i <- 0 to 1020) {
+      if (all.contains(i)) {
+        out(i) = 1
+      } else
+      out(i) = 0
+    }
+    out
+  }
+
 
   def main(args: Array[String]) {
 

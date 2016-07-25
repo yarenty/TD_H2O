@@ -30,8 +30,8 @@ object MLProcessor extends SparkContextSupport {
     println(s"\n\n H2O CONTEXT is HERE !!!!!!\n")
 
 
-    DataMunging.process(h2oContext)
-    DataMungingTest.process(h2oContext)
+//    DataMunging.process(h2oContext)
+//    DataMungingTest.process(h2oContext)
 
     BuildAdvancedModel.process(h2oContext)
 

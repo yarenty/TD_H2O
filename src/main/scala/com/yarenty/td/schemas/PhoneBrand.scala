@@ -6,7 +6,7 @@ import water.parser._
   * Created by yarenty on 15/07/2016.
   * (C)2015 SkyCorp Ltd.
   */
-class PhoneBrand(val device_id: Option[Long],
+class PhoneBrand(val device_id: Option[String],
                 val phone_brand: Option[String],
                 val device_model: Option[String]
             ) extends Product with Serializable {
@@ -41,7 +41,7 @@ object PhoneBrandParse extends Serializable {
     import water.support.ParseSupport._
 
     new PhoneBrand(
-      long(row(0)), // device_id
+      str(row(0)), // device_id
       str(row(1)), // brand
       str(row(2)) // model
     )
@@ -69,7 +69,7 @@ object PhoneBrandCSVParser {
     val orderNames: Array[String] = Array(
       "device_id","phone_brand","device_model")
     val orderTypes = ParseSetup.strToColumnTypes(Array(
-      "int", "enum", "enum"))
+      "string", "enum", "enum"))
     parseOrders.setColumnNames(orderNames)
     parseOrders.setColumnTypes(orderTypes)
     parseOrders.setParseType(DefaultParserProviders.CSV_INFO)
