@@ -1,38 +1,27 @@
 package com.yarenty.td
 
-import java.io.{File, FileOutputStream, PrintWriter}
+import java.io.File
 import java.net.URI
 
 import com.yarenty.td.schemas._
 import com.yarenty.td.utils.Helper
 import hex.Distribution
-import hex.deeplearning.{DeepLearning, DeepLearningModel}
 import hex.deeplearning.DeepLearningModel.DeepLearningParameters
-import hex.naivebayes.{NaiveBayes, NaiveBayesModel}
+import hex.deeplearning.{DeepLearning, DeepLearningModel}
 import hex.naivebayes.NaiveBayesModel.NaiveBayesParameters
+import hex.naivebayes.{NaiveBayes, NaiveBayesModel}
 import hex.tree.drf.DRFModel.DRFParameters
 import hex.tree.drf.{DRF, DRFModel}
-import hex.tree.gbm.GBMModel.GBMParameters
-import hex.tree.gbm.{GBM, GBMModel}
-import org.apache.commons.io.FileUtils
 import org.apache.spark.h2o.{H2OContext, H2OFrame}
 import org.apache.spark.sql.SQLContext
-import org.apache.spark.{h2o, SparkContext, SparkFiles}
-import water.{AutoBuffer, Key}
-import water.fvec.{Vec, Frame}
-import water.parser.{ParseSetup, ParseDataset}
+import org.apache.spark.{SparkFiles, h2o}
 import water.support.SparkContextSupport
-
-
-import MLProcessor.h2oContext._
-import MLProcessor.h2oContext.implicits._
-import MLProcessor.sqlContext.implicits._
 
 /**
   * Created by yarenty on 15/07/2016.
   * (C)2015 SkyCorp Ltd.
   */
-object BuildAdvancedModel extends SparkContextSupport {
+object BuildAdvancedEmptyModel extends SparkContextSupport {
 
 
   val data_dir = "/opt/data/TalkingData/model/"
@@ -44,7 +33,6 @@ object BuildAdvancedModel extends SparkContextSupport {
     import h2oContext._
     import h2oContext.implicits._
     implicit val sqlContext = new SQLContext(sc)
-    import sqlContext.implicits._
 
 
     println(s"\n\n LETS MODEL\n")
@@ -52,25 +40,31 @@ object BuildAdvancedModel extends SparkContextSupport {
 
     var trainData: H2OFrame = null
     var validData: H2OFrame = null
+//    try {
 
-    addFiles(sc, absPath(data_dir + "full_train"))
-    val trainURI = new URI("file:///" + SparkFiles.get("full_train"))
-    val tData = new h2o.H2OFrame(ModelFullCSVParser.get, trainURI)
+      addFiles(sc, absPath(data_dir + "empty_train"))
+      val trainURI = new URI("file:///" + SparkFiles.get("empty_train"))
+      val tData = new h2o.H2OFrame(ModelEmptyCSVParser.get, trainURI)
+      val empty = asDataFrame(tData)
+      empty.registerTempTable("emptys")
 
 
 
 
-    println("SPLIT")
-    val dt = asDataFrame(tData).randomSplit(Array(0.9, 0.1), 666)
+      println("SPLIT")
+      val dt = asDataFrame(tData).randomSplit(Array(0.9, 0.1), 66600)
 
-    trainData = asH2OFrame(dt(0), "train")
-    validData = asH2OFrame(dt(1), "valid")
+      trainData = asH2OFrame(dt(0), "train")
+      validData = asH2OFrame(dt(1), "valid")
 
-    trainData.colToEnum(Array("gender", "brand", "model", "grup"))
-    validData.colToEnum(Array("gender", "brand", "model", "grup"))
+      trainData.colToEnum(Array("gender", "brand", "model", "grup"))
+      validData.colToEnum(Array("gender", "brand", "model", "grup"))
+//    } catch {
+//      case e: Exception => //do nothing
+//    }
 
     println("MODEL")
-    val nbModel = DLModel(trainData, validData)
+    val nbModel = DRFModel(trainData, validData)
 
     println("DONE")
     // SAVE THE MODEL!!!
@@ -83,10 +77,11 @@ object BuildAdvancedModel extends SparkContextSupport {
     //    println("JAVA and hex(iced) models saved.")
 
 
-    addFiles(sc, absPath(data_dir + "full_test"))
-    val testURI = new URI("file:///" + SparkFiles.get("full_test"))
-    val testData = new h2o.H2OFrame(ModelFullCSVParser.get, testURI)
-    testData.colToEnum(Array("brand", "model"))
+    addFiles(sc, absPath(data_dir + "empty_test"))
+    val testURI = new URI("file:///" + SparkFiles.get("empty_test"))
+    val testData = new h2o.H2OFrame(ModelEmptyCSVParser.get, testURI)
+    testData.colToEnum(Array("brand", "model", "grup"))
+    testData.remove("grup")
 
     println("TEST")
     val predict = nbModel.score(testData)
@@ -94,16 +89,15 @@ object BuildAdvancedModel extends SparkContextSupport {
     //    predict.add("device_id", testData.vec("device"))
     //    predict.remove("predict")
     println("RENAMING - FIX")
-    predict.replace(0, testData.vec("device"))
     predict.rename("predict", "device_id")
     predict.rename(0, "device_id")
-
+    predict.replace(0, testData.vec("device"))
     // testData.add(predict)
 
     println("OUT")
     val out = new H2OFrame(predict)
 
-    Helper.saveCSV(out, data_dir + "submit_full.csv")
+    Helper.saveCSV(out, data_dir + "submit_empty.csv")
 
     println("=========> off to go!!!")
   }
@@ -153,19 +147,20 @@ object BuildAdvancedModel extends SparkContextSupport {
 
   //seed -1188814820856564594    =  2.34860
 
-  def DRFModel(smOutputTrain: H2OFrame): DRFModel = {
+  def DRFModel(train: H2OFrame, valid: H2OFrame): DRFModel = {
 
     val params = new DRFParameters()
-    params._train = smOutputTrain.key
+    params._train = train.key
+    params._valid = valid.key
     //    params._distribution = Distribution.Family.gaussian
     params._response_column = "grup"
     params._ignored_columns = Array("device", "gender", "age")
     params._ignore_const_cols = true
-    //    params._seed =  -6242730077026816667 //-1188814820856564594L  //5428260616053944984
+    //    params._seed =
 
-
+                                  //1760216159488620157 //20 => 2.32
     params._ntrees = 500
-    params._max_depth = 20 //-2515230053271016359
+    params._max_depth = 15
     params._distribution = Distribution.Family.AUTO
 
 
@@ -219,15 +214,14 @@ object BuildAdvancedModel extends SparkContextSupport {
     params._ignored_columns = Array("device", "gender", "age")
     params._ignore_const_cols = true
 
-    //    params._seed = -8823609696683622000L // 6433149976926940000L    //-8996666368897430268
+    //   params._seed = 2069917952182533400L // 6433149976926940000L    //-8996666368897430268
 
-    //    params._hidden = Array(512,256,128,64) //Feel Lucky
-    params._hidden = Array(288, 144, 72, 36) //Feel Lucky
+    params._hidden = Array( 576,144,72,36)
+//    params._hidden = Array(256, 128, 64, 32) //Feel Lucky
     //    params._hidden = Array(200,200) //Feel Lucky
     // params._hidden = Array(512) //Eagle Eye
-    // params._hidden = Array(64,64,64) //Puppy Brain
+//     params._hidden = Array(64,64,64) //Puppy Brain
     // params._hidden = Array(32,32,32,32,32) //Junior Chess Master
-
 
 
     params._epochs = 200.0

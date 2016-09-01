@@ -9,7 +9,7 @@ import water.parser._
   */
 class Event(val event_id: Option[Int],
                 val device_id: Option[String],
-                val timestamp: Option[Int],
+                val timeslice: Option[Int],
                 val longitude: Option[Float],
                 val latitude: Option[Float]
            ) extends Product with Serializable {
@@ -21,7 +21,7 @@ class Event(val event_id: Option[Int],
   override def productElement(n: Int) = n match {
     case 0 => event_id
     case 1 => device_id
-    case 2 => timestamp
+    case 2 => timeslice
     case 3 => longitude
     case 4 => latitude
     case _ => throw new IndexOutOfBoundsException(n.toString)
@@ -119,6 +119,27 @@ object EventCSVParser {
       "event_id","device_id","timestamp","longitude","latitude")
     val orderTypes = ParseSetup.strToColumnTypes(Array(
       "int", "string", "string", "double", "double"))
+    parseOrders.setColumnNames(orderNames)
+    parseOrders.setColumnTypes(orderTypes)
+    parseOrders.setParseType(DefaultParserProviders.CSV_INFO)
+    parseOrders.setNumberColumns(5)
+    parseOrders.setSeparator(44)
+    parseOrders.setSingleQuotes(false)
+    parseOrders.setCheckHeader(1)
+    return parseOrders
+  }
+
+}
+
+
+object EventClusterCSVParser {
+
+  def get: ParseSetup = {
+    val parseOrders: ParseSetup = new ParseSetup()
+    val orderNames: Array[String] = Array(
+      "event_id","device_id","timestamp","longitude","latitude")
+    val orderTypes = ParseSetup.strToColumnTypes(Array(
+      "int", "string", "time", "double", "double"))
     parseOrders.setColumnNames(orderNames)
     parseOrders.setColumnTypes(orderTypes)
     parseOrders.setParseType(DefaultParserProviders.CSV_INFO)

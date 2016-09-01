@@ -24,6 +24,7 @@ object DataMunging extends SparkContextSupport {
   val gender_age_train = "gender_age_train.csv"
   val app_events = "app_events.csv"
   val events = "events.csv"
+  val timeevents = "newevents_train.csv"
   val app_labels = "app_labels.csv"
   val label_categories = "label_categories.csv"
   val phone_brand = "phone_brand_device_model.csv"
@@ -45,7 +46,8 @@ object DataMunging extends SparkContextSupport {
       absPath(input_data_dir + app_events),
       absPath(input_data_dir + app_labels),
       absPath(input_data_dir + label_categories),
-      absPath(input_data_dir + events)
+      absPath(input_data_dir + events),
+      absPath(input_data_dir + timeevents)
     )
 
 
@@ -64,6 +66,11 @@ object DataMunging extends SparkContextSupport {
     println(s"\n===> eventData via H2O#Frame#count: ${eventData.numRows}\n")
     val eventDF = asDataFrame(eventData)
     eventDF.registerTempTable("events")
+
+    val timeEventData = new h2o.H2OFrame(EventsByTimeCSVParser.get, new File(SparkFiles.get(timeevents)))
+    println(s"\n===> timeEventData via H2O#Frame#count: ${timeEventData.numRows}\n")
+    val timeEventDF = asDataFrame(eventData)
+    timeEventDF.registerTempTable("timeevents")
 
 
     val appEventData = new h2o.H2OFrame(AppEventCSVParser.get, new File(SparkFiles.get(app_events)))
@@ -88,10 +95,17 @@ object DataMunging extends SparkContextSupport {
 
 
     ///get list of apptypes for each device_id
-    val ap = sqlContext.sql(" select distinct label_id, device_id from labels, apps, events " +
+    val aps = sqlContext.sql(" select distinct device_id, label_id, apps.app_id as app_id from labels, apps, events " +
       " where labels.app_id = apps.app_id and apps.event_id = events.event_id ")
+    aps.registerTempTable("apps")
+
+
+    val ap = sqlContext.sql(" select device_id, label_id, count(app_id) as ile from apps " +
+      " group by device_id, label_id ")
     ap.registerTempTable("apptypes")
-    val o = sqlContext.sql("select g.device_id as device_id, gender, age, phone_brand, device_model, grup, label_id " +
+
+
+    val o = sqlContext.sql("select g.device_id as device_id, gender, age, phone_brand, device_model, grup, label_id, ile " +
       " from " +
       "  (select genderage.device_id as device_id, " +
       "     first(gender) as gender, first(age) as age, first(group) as grup, " +
@@ -100,10 +114,9 @@ object DataMunging extends SparkContextSupport {
       "  LEFT JOIN  apptypes ON g.device_id = apptypes.device_id ")
 
     val out = o.groupBy("device_id", "gender", "age", "phone_brand", "device_model", "grup").agg(
-      GroupConcat(o("label_id")).alias("labels")).distinct()
+      GroupConcat(o("label_id")).alias("labels"),GroupConcat(o("ile")).alias("iles")).distinct()
 
     out.take(20).foreach(println)
-
 
     for (m <- sc.getExecutorMemoryStatus) println("MEMORY STATUS:: " + m._1 + " => " + m._2)
 
@@ -139,36 +152,13 @@ object DataMunging extends SparkContextSupport {
   }
 
 
-  //Dropping constant columns: [907, 908, 909, 912, 913, 914, 915, 916, 1, 2, 4, 6, 800, 921,
-  // 922, 925, 930, 1005, 1002, 700, 1001, 701, 702, 703, 704, 831, 832, 833, 834, 835, 836,
-  // 837, 838, 839, 962, 600, 963, 601, 964, 602, 965, 603, 966, 604, 967, 605, 726, 968, 606,
-  // 727, 607, 728, 849, 608, 729, 609, 850, 730, 851, 610, 852, 611, 853, 612, 854, 613, 734, 614, 615,
-  // 736, 616, 617, 618, 619, 980, 740, 982, 620, 741, 500, 621, 742, 501, 622, 743, 502, 623, 744, 986,
-  // 503, 624, 504, 625, 746, 505, 626, 747, 506, 627, 507, 628, 508, 629, 509, 990, 630, 751, 993, 510, 631,
-  // 511, 632, 995, 512, 633, 754, 513, 634, 755, 876, 514, 635, 877, 515, 636, 878, 516, 637, 879, 517, 638, 518,
-  // 639, 519, 880, 881, 640, 882, 520, 641, 883, 400, 521, 642, 884, 401, 522, 643, 764, 885, 402, 523, 644, 765,
-  // 886, 403, 524, 645, 766, 887, 404, 525, 646, 767, 888, 405, 526, 647, 768, 889, 527, 648, 769, 528, 649, 529,
-  // 409, 890, 770, 891, 650, 892, 530, 651, 893, 410, 531, 652, 894, 411, 532, 653, 895, 412, 533, 654, 896, 413, 534,
-  // 655, 897, 414, 535, 656, 898, 415, 536, 657, 899, 416, 537, 658, 417, 538, 659, 418, 539, 419, 660, 540, 661, 420, 541,
-  // 662, 300, 421, 542, 663, 301, 422, 543, 664, 785, 302, 423, 544, 665, 424, 545, 666, 425, 546, 667, 305, 426, 547,
-  // 668, 306, 427, 548, 669, 428, 308, 429, 309, 670, 671, 430, 551, 672, 310, 431, 673, 311, 432, 674, 312, 433, 675,
-  // 313, 434, 555, 676, 314, 435, 677, 315, 436, 557, 678, 316, 437, 558, 679, 438, 439, 680, 681, 440, 561, 682, 320, 441,
-  // 562, 683, 321, 442, 684, 322, 443, 685, 323, 444, 686, 203, 324, 445, 687, 325, 446, 688, 326, 447, 568, 448, 328, 449, 329,
-  // 209, 570, 450, 571, 330, 451, 572, 331, 452, 573, 694, 332, 453, 574, 333, 454, 575, 334, 455, 576, 697, 335, 456, 577, 698,
-  // 336, 457, 578, 699, 337, 458, 579, 338, 459, 339, 580, 460, 581, 340, 461, 582, 341, 462, 583, 342, 463, 584, 343, 464, 585,
-  // 344, 465, 586, 345, 466, 587, 346, 467, 588, 347, 468, 589, 348, 469, 107, 349, 108, 229, 109, 590, 470, 591, 350, 471, 592,
-  // 351, 472, 593, 110, 352, 473, 594, 111, 353, 474, 595, 112, 354, 475, 596, 113, 355, 476, 597, 114, 356, 477, 598, 115, 357,
-  // 478, 599, 116, 358, 479, 117, 359, 118, 119, 16, 480, 360, 481, 240, 361, 482, 120, 362, 483, 121, 363, 484, 122, 243, 364,
-  // 485, 123, 244, 365, 486, 124, 245, 366, 487, 125, 367, 488, 126, 368, 489, 127, 369, 128, 249, 29, 490, 370, 491, 371, 492,
-  // 372, 493, 373, 494, 374, 495, 375, 496, 134, 376, 497, 377, 498, 378, 499, 379, 35, 380, 381, 382, 383, 384, 385, 144, 265,
-  // 386, 266, 387, 146, 388, 147, 389, 390, 391, 392, 393, 394, 395, 396, 397, 156, 398, 399, 279, 286, 166, 287, 288, 289, 68,
-  // 290, 291, 292, 172, 293, 294, 295, 296, 297, 177, 298, 299, 183, 197, 900, 901, 902, 903, 904, 905, 906]
+  //@TODO: Dropping constant columns:
 
 
   def lineBuilder(out: DataFrame): Frame = {
 
     val headers = Array(
-      "device", "gender", "age", "brand", "model", "grup") ++ (1 to 1021).map(i => i.toString)
+      "device", "gender", "age", "brand", "model", "grup") ++ (1 to 1021).map(i => i.toString) ++ (1 to 144).map(i => "t"+i.toString)
     val startIdx = 6
     val len = headers.length
     println("LEN::" + len)
@@ -189,7 +179,7 @@ object DataMunging extends SparkContextSupport {
     }
 
     println("Structure is there")
-    out.collect.foreach(ae => {
+    out.collect.foreach(ae => {     //collect
 
       //println("AND::" + ae.get(0)+ "::"+ae.get(1) +"::"+ae.get(2))
       chunks(0).addStr(ae.getString(0)) //device_id
@@ -201,7 +191,7 @@ object DataMunging extends SparkContextSupport {
       chunks(5).addStr(ae.getString(5))
 
       if (ae.get(startIdx) != null && ae.getString(startIdx).length > 2) {
-        val m = Helper.mapCreator(ae.getString(startIdx))
+        val m = Helper.mapCreator(ae.getString(startIdx),ae.getString(startIdx+1))
         for (i <- startIdx until len) chunks(i).addNum(m(i - startIdx))
       } else {
         for (i <- startIdx until len) chunks(i).addNA()

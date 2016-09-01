@@ -58,13 +58,13 @@ object Helper {
     * @param str
     * @return
     */
-  def mapCreator(str: String): Array[Int] = {
+  def mapCreator(str: String, vals:String): Array[Int] = {
     val all = str.split(",").map( i => i.toInt)
-
+    val valall = vals.split(",").map( i => i.toInt)
     val out = new Array[Int](1021)
     for (i <- 0 to 1020) {
-      if (all.contains(i)) {
-        out(i) = 1
+      if (all.contains(i+1)) {
+        out(i) = valall(all.indexOf(i+1))
       } else
       out(i) = 0
     }

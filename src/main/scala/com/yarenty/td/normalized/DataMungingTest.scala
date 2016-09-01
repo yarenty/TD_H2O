@@ -83,11 +83,17 @@ object DataMungingTest extends SparkContextSupport {
 
     for (m <- sc.getExecutorMemoryStatus) println("MEMORY STATUS:: " + m._1 + " => " + m._2)
 
-
-    val ap = sqlContext.sql(" select distinct label_id, device_id from labels, apps, events " +
+    val aps = sqlContext.sql(" select distinct device_id, label_id, apps.app_id as app_id from labels, apps, events " +
       " where labels.app_id = apps.app_id and apps.event_id = events.event_id ")
+    aps.registerTempTable("apps")
+
+
+    val ap = sqlContext.sql(" select device_id, label_id, count(app_id) as ile from apps " +
+      " group by device_id, label_id ")
     ap.registerTempTable("apptypes")
-    val o = sqlContext.sql("select g.device_id as device_id,  \"M\" as gender, \"0\" as age, \"G\" as grup, phone_brand, device_model, label_id " +
+
+
+    val o = sqlContext.sql("select g.device_id as device_id,  \"M\" as gender, \"0\" as age, \"G\" as grup, phone_brand, device_model, label_id, ile " +
       " from " +
       "  (select genderage.device_id as device_id, " +
       "     first(phone_brand) as phone_brand, first(device_model) as device_model " +
@@ -95,7 +101,7 @@ object DataMungingTest extends SparkContextSupport {
       "  LEFT JOIN  apptypes ON g.device_id = apptypes.device_id ")
 
     val out = o.groupBy("device_id", "gender", "age", "phone_brand", "device_model", "grup").agg(
-      GroupConcat(o("label_id")).alias("labels")).distinct()
+      GroupConcat(o("label_id")).alias("labels"),GroupConcat(o("ile")).alias("iles")).distinct()
 
     out.take(20).foreach(println)
 
@@ -182,7 +188,7 @@ object DataMungingTest extends SparkContextSupport {
 
 
       if (ae.get(startIdx) != null && ae.getString(startIdx).length > 2) {
-        val m = Helper.mapCreator(ae.getString(startIdx))
+        val m = Helper.mapCreator(ae.getString(startIdx),ae.getString(startIdx+1))
         for (i <- startIdx until len) chunks(i).addNum(m(i - startIdx))
       } else {
         for (i <- startIdx until len) chunks(i).addNA()
