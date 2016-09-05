@@ -1,13 +1,17 @@
 package com.yarenty.td
 
 import java.net.URI
+import java.util
 
+import com.yarenty.td.normalized.EventsClusteringProcessing
 import com.yarenty.td.schemas._
 import com.yarenty.td.utils.Helper
 import hex.Distribution
+import hex.ScoreKeeper.StoppingMetric
 import hex.deeplearning.DeepLearningModel.DeepLearningParameters
 import hex.deeplearning.DeepLearningModel.DeepLearningParameters.MissingValuesHandling
 import hex.deeplearning.{DeepLearning, DeepLearningModel}
+import hex.grid.{Grid, GridSearch}
 import hex.naivebayes.NaiveBayesModel.NaiveBayesParameters
 import hex.naivebayes.{NaiveBayes, NaiveBayesModel}
 import hex.tree.drf.DRFModel.DRFParameters
@@ -43,39 +47,39 @@ object BuildAdvancedAllModel extends SparkContextSupport {
 
     //RECREATE::
 
-      addFiles(sc, absPath(data_dir + "all_train"))
-      val trainURI = new URI("file:///" + SparkFiles.get("all_train"))
-      val tData = new h2o.H2OFrame(ModelFullCSVParser.get, trainURI)
-
-
-
-
-      println("SPLIT")
-      val dt = asDataFrame(tData).randomSplit(Array(0.9, 0.1), 999)
-
-      trainData = asH2OFrame(dt(0), "train")
-      validData = asH2OFrame(dt(1), "valid")
-
-      trainData.colToEnum(Array("gender", "brand", "model", "grup"))
-      validData.colToEnum(Array("gender", "brand", "model", "grup"))
-
-      Helper.saveCSV(trainData, data_dir + "train_09")
-      Helper.saveCSV(validData, data_dir + "valid_01")
+//      addFiles(sc, absPath(data_dir + "all_train"))
+//      val trainURI = new URI("file:///" + SparkFiles.get("all_train"))
+//      val tData = new h2o.H2OFrame(ModelFullCSVParser.get, trainURI)
+//
+//
+//
+//
+//
+//      println("SPLIT")
+//      val dt = asDataFrame(tData).randomSplit(Array(0.99, 0.01), 666)
+//
+//      trainData = asH2OFrame(dt(0), "train")
+//      validData = asH2OFrame(dt(1), "valid")
+//
+//      trainData.colToEnum(Array("gender", "brand", "model", "grup"))
+//      validData.colToEnum(Array("gender", "brand", "model", "grup"))
+//
+//      Helper.saveCSV(trainData, data_dir + "train_09")
+//      Helper.saveCSV(validData, data_dir + "valid_01")
 
 
 
     //FIXME:
+    //JUST PLAING:
+        addFiles(sc, absPath(data_dir + "train_09"))
+        trainData = new h2o.H2OFrame(ModelFullCSVParser.get, new URI("file:///" + SparkFiles.get("train_09" )) )
 
 
+        addFiles(sc, absPath(data_dir + "valid_01"))
+        validData = new h2o.H2OFrame(ModelFullCSVParser.get, new URI("file:///" + SparkFiles.get("valid_01" )))
 
-//    //JUST PLAING:
-//        addFiles(sc, absPath(data_dir + "train_09"))
-//        trainData = new h2o.H2OFrame(ModelFullCSVParser.get, new URI("file:///" + SparkFiles.get("train_09" )) )
-//        addFiles(sc, absPath(data_dir + "valid_01"))
-//        validData = new h2o.H2OFrame(ModelFullCSVParser.get, new URI("file:///" + SparkFiles.get("valid_01" )))
-//
-//        trainData.colToEnum(Array("gender", "brand", "model", "grup"))
-//        validData.colToEnum(Array("gender", "brand", "model", "grup"))
+        trainData.colToEnum(Array("gender", "brand", "model", "grup"))
+        validData.colToEnum(Array("gender", "brand", "model", "grup"))
 
 
 
@@ -109,9 +113,9 @@ object BuildAdvancedAllModel extends SparkContextSupport {
     //    predict.add("device_id", testData.vec("device"))
     //    predict.remove("predict")
     println("RENAMING - FIX")
-    predict.replace(0, testData.vec("device"))
-    predict.rename("predict", "device_id")
-    predict.rename(0, "device_id")
+    predict.add("device_id",testData.vec("device"))
+    predict.remove("predict")
+
 
     // testData.add(predict)
 
@@ -175,13 +179,14 @@ object BuildAdvancedAllModel extends SparkContextSupport {
     params._valid = valid.key
     //    params._distribution = Distribution.Family.gaussian
     params._response_column = "grup"
-    params._ignored_columns = Array("device", "gender", "age")
+    params._ignored_columns = Array("device", "gender", "age") ++ (0 until EventsClusteringProcessing.K).map(i => "c"+i.toString)
     params._ignore_const_cols = true
     //    params._seed =  -6242730077026816667 //-1188814820856564594L  //5428260616053944984
 
+    params._nbins = 256
 
-    params._ntrees = 500
-    params._max_depth = 20 //-2515230053271016359
+    params._ntrees = 1500
+    params._max_depth = 40 //-2515230053271016359
     params._distribution = Distribution.Family.AUTO
 
 
@@ -200,27 +205,78 @@ object BuildAdvancedAllModel extends SparkContextSupport {
     params._train = train.key
     params._valid = valid.key
     params._response_column = "grup"
-    params._ignored_columns = Array("device", "gender", "age")
+    params._ignored_columns = Array("device", "gender", "age") ++ (0 until EventsClusteringProcessing.K).map(i => "c"+i.toString)
     params._ignore_const_cols = true
     params._epochs = 500.0
-    params._standardize = true
+//    params._standardize = false
+    params._activation = DeepLearningParameters.Activation.TanhWithDropout
+//    params._input_dropout_ratio =0.02
+    params._hidden_dropout_ratios = Array(0.05,0.05,0.05,0.05,0.05,0.05)
+
 //    params._score_each_iteration = true
     params._variable_importances = true
 
-    params._seed = -6760352068770269000L    //2.2663-2.3119
+    params._max_w2  = 10
+    params._stopping_metric =  StoppingMetric.logloss
+    params._stopping_rounds = 42
+
+    params._adaptive_rate = false
+    params._rate = 0.01
+    params._rate_annealing = 2e-6
+
+    params._momentum_start=0.2
+    params._momentum_stable=0.4
+    params._momentum_ramp=1e7
+
+    params._l1=1e-3
+    params._l2=1e-3
+
+
+//    params._seed = -631241300168257500L   //2.2663-2.3119
 //    params._overwrite_with_best_model = false
     //params._shuffle_training_data = true
-//    params._hidden = Array( 545,109,36)
+//    params._hidden = Array(768,384,192,96,48,24)
 //    params._hidden = Array(512,256,128,64) //Feel Lucky
 //    params._hidden = Array(200,200,200) //Feel Lucky
     // params._hidden = Array(512) //Eagle Eye
-    // params._hidden = Array(64, 64, 64) //Puppy Brain
-     params._hidden = Array(32,32,32,32,32) //Junior Chess Master
+     params._hidden = Array(64,64,64,64,64,64) //Puppy Brain
+//     params._hidden = Array(32,32,32,32,32,32) //Junior Chess Master
     println("BUILDING:" + params.fullName)
     val dl = new DeepLearning(params)
     dl.trainModel.get
   }
 
+//
+//  def DGrid(train: H2OFrame, valid: H2OFrame): Unit = {
+//
+//     // Create initial parameters and fill them by references to data
+//     val params = new DeepLearningParameters
+//     params._train = train.key
+//     params._valid = valid.key
+//      params._response_column = "grup"
+//      params._ignored_columns = Array("device", "gender", "age") ++ (0 until EventsClusteringProcessing.K).map(i => "c"+i.toString)
+//      params._ignore_const_cols = true
+//      params._epochs = 500.0
+//      params._standardize = false
+//
+//
+//      // Define hyper-space to search
+//      val hyperParms = new util.HashMap[String, Array]()
+//      hyperParms.put("_ntrees", Array(1, 2))
+//    hyperParms.put("_distribution",Array(Distribution.Family.multinomial))
+////      hyperParms.put("_max_depth",new Integer[]{1,2,5});
+////      hyperParms.put("_learn_rate",new Float[]{0.01f,0.1f,0.3f});
+//
+//      // Launch grid search job creating GBM models
+//      val gridSearchJob = GridSearch.startGridSearch(new water.Key[Grid](),params, hyperParms);
+//
+//      // Block till the end of the job and get result
+//      val grid = gridSearchJob.get()
+//
+//      // Get built models
+//      val  models = grid.getModels()
+//
+//  }
 
 }
 

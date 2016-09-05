@@ -69,7 +69,7 @@ object PhoneBrandCSVParser {
     val orderNames: Array[String] = Array(
       "device_id","phone_brand","device_model")
     val orderTypes = ParseSetup.strToColumnTypes(Array(
-      "string", "enum", "enum"))
+      "int", "enum", "enum"))
     parseOrders.setColumnNames(orderNames)
     parseOrders.setColumnTypes(orderTypes)
     parseOrders.setParseType(DefaultParserProviders.CSV_INFO)

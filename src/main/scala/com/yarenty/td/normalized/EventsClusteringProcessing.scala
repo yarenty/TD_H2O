@@ -35,7 +35,7 @@ object EventsClusteringProcessing extends SparkContextSupport {
 
 
 
-  val K=200
+  val K=1000
 
   def process(h2oContext: H2OContext) {
 

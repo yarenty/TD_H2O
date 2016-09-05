@@ -71,7 +71,7 @@ object GenderAgeCSVParser {
     val orderNames: Array[String] = Array(
       "device_id","gender","age","group")
     val orderTypes = ParseSetup.strToColumnTypes(Array(
-      "string", "enum", "enum", "string"))
+      "int", "enum", "enum", "string"))
     parseOrders.setColumnNames(orderNames)
     parseOrders.setColumnTypes(orderTypes)
     parseOrders.setParseType(DefaultParserProviders.CSV_INFO)
@@ -91,7 +91,7 @@ object GenderAgeTestCSVParser {
     val orderNames: Array[String] = Array(
       "device_id")
     val orderTypes = ParseSetup.strToColumnTypes(Array(
-      "string"))
+      "int"))
     parseOrders.setColumnNames(orderNames)
     parseOrders.setColumnTypes(orderTypes)
     parseOrders.setParseType(DefaultParserProviders.CSV_INFO)
